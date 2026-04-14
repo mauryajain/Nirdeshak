@@ -8,6 +8,9 @@ COPY package*.json ./
 # Install ALL dependencies (including vite/build tools)
 RUN npm install
 
+# Fix execute permissions on CLI binaries (required on Alpine Linux)
+RUN chmod -R +x node_modules/.bin/
+
 # Copy source files
 COPY . .
 
