@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, Globe, User, Mic, Send, Clock } from 'lucide-react';
+import { useLanguage } from '../../lib/LanguageContext';
 import { ChatBubble } from '../chat/chat-bubble';
 import { QuickReplyChips } from '../chat/quick-reply-chips';
 import { ContextCard } from '../chat/context-card';
@@ -71,7 +72,7 @@ export function ChatTab({
   savedScroll,
   onSaveScroll,
 }: ChatTabProps) {
-  const [language, setLanguage] = useState<'हि' | 'Bho' | 'বাং'>('हि');
+  const { language, setLanguage } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -92,19 +93,11 @@ export function ChatTab({
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('nirdeshak-language');
-    if (saved === 'हि' || saved === 'Bho' || saved === 'বাং') {
-      setLanguage(saved);
-    }
     setSpeechSupported(
       typeof window !== 'undefined' &&
         !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
     );
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('nirdeshak-language', language);
-  }, [language]);
 
   useEffect(() => {
     if (scrollRef.current) {
