@@ -1,5 +1,6 @@
 import { CheckCircle, ArrowRight, Target } from 'lucide-react';
 import { formatIndianRupee, formatDate } from '../../utils/format';
+import { useLanguage } from '../../lib/LanguageContext';
 
 interface FDBookingSuccessCardProps {
   amount: number;
@@ -28,17 +29,25 @@ export function FDBookingSuccessCard({
   onGoHome,
   onDownloadReceipt,
 }: FDBookingSuccessCardProps) {
+  const { lang, language } = useLanguage();
+
   // Calculate the goal status message
   let goalStatusMessage = '';
   
   if (projectedTotal > targetAmount) {
     const extra = projectedTotal - targetAmount;
-    goalStatusMessage = `Goal poora ho jayega — aur ${formatIndianRupee(extra)} extra bhi bachega`;
+    if (language === 'हि') goalStatusMessage = `Goal पूरा हो जाएगा — और ${formatIndianRupee(extra)} एक्स्ट्रा भी बचेगा`;
+    else if (language === 'Bho') goalStatusMessage = `लक्ष्य पूरा हो जाई — अउर ${formatIndianRupee(extra)} बेसी रही`;
+    else goalStatusMessage = `লক্ষ্য পূরণ হবে — এবং ${formatIndianRupee(extra)} অতিরিক্ত থাকবে`;
   } else if (projectedTotal === targetAmount) {
-    goalStatusMessage = 'Goal poora ho jayega';
+    if (language === 'हि') goalStatusMessage = 'Goal पूरा हो जाएगा';
+    else if (language === 'Bho') goalStatusMessage = 'लक्ष्य पूरा हो जाई';
+    else goalStatusMessage = 'লক্ষ্য পূরণ হবে';
   } else {
     const shortfall = targetAmount - projectedTotal;
-    goalStatusMessage = `Goal ke liye ${formatIndianRupee(shortfall)} aur chahiye`;
+    if (language === 'हि') goalStatusMessage = `Goal के लिए ${formatIndianRupee(shortfall)} और चाहिए`;
+    else if (language === 'Bho') goalStatusMessage = `लक्ष্য खातिर ${formatIndianRupee(shortfall)} अउर चाहीं`;
+    else goalStatusMessage = `লক্ষ্যের জন্য আরও ${formatIndianRupee(shortfall)} প্রয়োজন`;
   }
 
   return (
@@ -48,7 +57,9 @@ export function FDBookingSuccessCard({
           <div className="bg-white/20 p-2 rounded-full">
             <CheckCircle className="w-8 h-8 text-white" />
           </div>
-          <h3 className="text-2xl font-bold">FD Ho Gayi!</h3>
+          <h3 className="text-2xl font-bold">
+            {language === 'हि' ? 'FD हो गयी!' : language === 'Bho' ? 'FD हो गइल!' : 'FD হয়ে গেছে!'}
+          </h3>
         </div>
 
         <div className="bg-white/10 rounded-xl p-4 mb-4">
@@ -58,8 +69,8 @@ export function FDBookingSuccessCard({
             <span className="text-2xl font-bold">{formatIndianRupee(maturityAmount)}</span>
           </div>
           <div className="space-y-1 text-sm text-white/80">
-            <p className="font-semibold">{bankName} · {tenure} mahine</p>
-            <p>{formatDate(maturityDate)} ko paisa milega</p>
+            <p className="font-semibold">{bankName} · {tenure} {language === 'বাং' ? 'মাস' : 'महीने'}</p>
+            <p>{formatDate(maturityDate)} {language === 'हि' ? 'को पैसा मिलेगा' : language === 'Bho' ? 'के पइसा मिली' : 'টাকা পাবেন'}</p>
           </div>
         </div>
 
@@ -77,7 +88,7 @@ export function FDBookingSuccessCard({
           onClick={onViewGoal}
           className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary/90 active:scale-98 transition-all shadow-sm flex items-center justify-center gap-2"
         >
-          <span>Goal dekhein</span>
+          <span>{language === 'हि' ? 'Goal देखें' : language === 'Bho' ? 'लक्ष्य देखीं' : 'লক্ষ্য দেখুন'}</span>
           <ArrowRight className="w-4 h-4" />
         </button>
 
@@ -94,7 +105,7 @@ export function FDBookingSuccessCard({
           onClick={onGoHome}
           className="w-full bg-gray-100 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-200 active:scale-98 transition-all flex items-center justify-center gap-2"
         >
-          <span>Ghar jaein</span>
+          <span>{language === 'हि' ? 'घर जाएं' : language === 'Bho' ? 'घर जाईं' : 'হোমে ফিরে যান'}</span>
         </button>
       </div>
     </div>

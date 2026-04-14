@@ -1,14 +1,17 @@
+import { useLanguage } from '../../lib/LanguageContext';
+
 interface StepCounterProps {
   currentStep: number;
   totalSteps: number;
 }
 
 export function StepCounter({ currentStep, totalSteps }: StepCounterProps) {
+  const { lang, language } = useLanguage();
   return (
     <div className="sticky top-0 z-10 bg-primary/10 backdrop-blur-sm px-4 py-2 border-b border-primary/20 animate-in fade-in slide-in-from-top duration-300">
       <div className="max-w-[390px] mx-auto flex items-center justify-between">
         <p className="text-sm font-medium text-gray-700">
-          FD बुकिंग प्रक्रिया
+          {language === 'हि' ? 'FD बुकिंग प्रक्रिया' : language === 'Bho' ? 'FD बुकिंग प्रक्रिया' : 'FD বুকিং প্রক্রিয়া'}
         </p>
         <div className="flex items-center gap-2">
           <div className="flex gap-1">

@@ -8,6 +8,8 @@ import { Notifications } from './components/notifications';
 import type { Goal, ActiveFD } from './lib/types';
 import type { BankAccount, FDOption, FDRecord, NotificationRecord, SurplusPayload } from './lib/api';
 import * as api from './lib/api';
+import { useLanguage } from './lib/LanguageContext';
+import { formatIndianRupee } from './utils/format';
 
 interface SelectedInvestment {
   goalName: string;
@@ -23,26 +25,33 @@ interface UserInfo {
   bankAccounts: BankAccount[];
 }
 
-const normalizeGoal = (raw: any): Goal => ({
-  id: raw.id,
-  name: raw.name,
-  icon: raw.icon,
-  targetAmount: raw.targetAmount,
-  jamaHua: raw.jamaHua,
-  deadline: new Date(raw.deadline),
-  status: raw.status,
-  completedAt: raw.completedAt ? new Date(raw.completedAt) : null,
-  idleMaturedMoney: raw.idleMaturedMoney,
-  activeFDs: raw.activeFDs.map((fd: any) => ({
-    bankName: fd.bankName,
-    amount: fd.amount,
-    maturityDate: new Date(fd.maturityDate),
-    maturityAmount: fd.maturityAmount,
-    tenure: fd.tenure,
-  })),
-});
-
 export default function App() {
+  const { lang, language } = useLanguage();
+
+  const normalizeGoal = useCallback((raw: any): Goal => {
+    // Attempt translation of Goal names if they match server known strings
+    const matchedTranslation = lang.goalNames[raw.name as keyof typeof lang.goalNames];
+    
+    return {
+      id: raw.id,
+      userId: raw.userId,
+      name: matchedTranslation || raw.name,
+      icon: raw.icon,
+      targetAmount: raw.targetAmount,
+      jamaHua: raw.jamaHua,
+      deadline: new Date(raw.deadline),
+      status: raw.status,
+      completedAt: raw.completedAt ? new Date(raw.completedAt) : null,
+      idleMaturedMoney: raw.idleMaturedMoney,
+      activeFDs: raw.activeFDs.map((fd: any) => ({
+        bankName: fd.bankName,
+        amount: fd.amount,
+        maturityDate: new Date(fd.maturityDate),
+        maturityAmount: fd.maturityAmount,
+        tenure: fd.tenure,
+      })),
+    };
+  }, [lang]);
   const [activeTab, setActiveTab] = useState<'chat' | 'rates' | 'goals'>('chat');
   const [user, setUser] = useState<UserInfo | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -59,20 +68,26 @@ export default function App() {
       const goalRecords = await api.getGoals();
       setGoals(goalRecords.map(normalizeGoal));
     } catch (error) {
-      toast.error('Goals लोड नहीं हो पाए');
+      toast.error(language === 'हि' ? 'Goals लोड नहीं हो पाए' : language === 'Bho' ? 'लक्ष्य लोड ना हो पावल' : 'লক্ষ্য লোড হতে ব্যর্থ');
       console.error(error);
     }
-  }, []);
+  }, [normalizeGoal, language]);
 
   const refreshSurplus = useCallback(async () => {
     try {
-      const nextSurplus = await api.getSurplus();
-      setSurplus(nextSurplus);
+      const data = await api.getSurplus();
+      const localizedReasoning = lang.goalsTab.surplusReasoning(
+        formatIndianRupee(data.savingsTotal),
+        formatIndianRupee(data.emergencyFund),
+        formatIndianRupee(data.upcomingExpenses),
+        formatIndianRupee(data.investedTotal)
+      );
+      setSurplus({ ...data, reasoning: localizedReasoning });
     } catch (error) {
-      toast.error('Surplus लोड नहीं हो पाया');
+      toast.error(language === 'हि' ? 'Surplus लोड नहीं हो पाया' : language === 'Bho' ? 'Surplus लोड ना हो पावल' : 'সারপ্লাস লোড হতে ব্যর্থ');
       console.error(error);
     }
-  }, []);
+  }, [lang, language]);
 
   const refreshNotifications = useCallback(async () => {
     try {
@@ -80,7 +95,7 @@ export default function App() {
       setNotifications(nextNotifications);
       setUnreadCount(nextNotifications.filter((item) => !item.isRead).length);
     } catch (error) {
-      toast.error('सूचनाएँ लोड नहीं हो सकीं');
+      toast.error(language === 'हि' ? 'सूचनाएँ लोड नहीं हो सकीं' : language === 'Bho' ? 'सूचना लोड ना हो सकल' : 'বিজ্ঞপ্তি লোড হতে ব্যর্থ');
       console.error(error);
     }
   }, []);
@@ -90,7 +105,7 @@ export default function App() {
       const currentUser = await api.getUser('1');
       setUser(currentUser);
     } catch (error) {
-      toast.error('यूजर डेटा लोड नहीं हो पाया');
+      toast.error(language === 'हि' ? 'यूजर डेटा लोड नहीं हो पाया' : language === 'Bho' ? 'यूजर डेटा लोड ना हो पावल' : 'ইউজার ডেটা লোড হতে ব্যর্থ');
       console.error(error);
     }
   }, []);
@@ -106,7 +121,7 @@ export default function App() {
   const handleSelectFD = (fd: FDOption) => {
     const priorityGoal = goals.find((goal) => goal.status === 'behind' || goal.status === 'at-risk') || goals[0];
     if (!priorityGoal) {
-      toast.error('कोई goal उपलब्ध नहीं है');
+      toast.error(language === 'हि' ? 'कोई लक्ष्य उपलब्ध नहीं है' : language === 'Bho' ? 'कवनो लक्ष्य नईखे' : 'কোনো লক্ষ্য উপলব্ধ নেই');
       return;
     }
 
@@ -132,7 +147,7 @@ export default function App() {
   const handleAddFD = async (goalName: string, newFD: ActiveFD): Promise<FDRecord | null> => {
     const goal = goals.find((item) => item.name === goalName);
     if (!goal) {
-      toast.error('Goal नहीं मिला');
+      toast.error(language === 'हि' ? 'Goal नहीं मिला' : language === 'Bho' ? 'लक्ष्य ना मिलल' : 'লক্ষ্য পাওয়া যায়নি');
       return null;
     }
 
@@ -149,12 +164,17 @@ export default function App() {
       };
       const result = await api.createFd(payload);
       await refreshGoals();
-      await refreshSurplus();
-      setGoals((prevGoals) =>
-        prevGoals.map((item) => (item.id === result.goal.id ? normalizeGoal(result.goal) : item))
+      
+      const nextSurplus = result.surplus;
+      const localizedReasoning = lang.goalsTab.surplusReasoning(
+        formatIndianRupee(nextSurplus.savingsTotal),
+        formatIndianRupee(nextSurplus.emergencyFund),
+        formatIndianRupee(nextSurplus.upcomingExpenses),
+        formatIndianRupee(nextSurplus.investedTotal)
       );
-      setSurplus(result.surplus);
-      toast.success('FD सफलतापूर्वक बुक किया गया');
+      setSurplus({ ...nextSurplus, reasoning: localizedReasoning });
+
+      toast.success(language === 'हि' ? 'FD सफलतापूर्वक बुक किया गया' : language === 'Bho' ? 'FD सफलतापूर्वक बुक हो गइल' : 'FD সফলভাবে বুক করা হয়েছে');
       return result.fd;
     } catch (error) {
       toast.error('FD बुकिंग में समस्या आई');
@@ -167,9 +187,9 @@ export default function App() {
     try {
       await api.updateGoal(goalId, { deadline: newDeadline });
       await refreshGoals();
-      toast.success('Deadline updated');
+      toast.success(language === 'हि' ? 'तारीख अपडेट हो गई' : language === 'Bho' ? 'तारीख अपडेट हो गइल' : 'সময়সীমা আপডেট করা হয়েছে');
     } catch (error) {
-      toast.error('Deadline update failed');
+      toast.error(language === 'हि' ? 'अपडेट फेल हो गया' : language === 'Bho' ? 'अपडेट फेल हो गइल' : 'আপডেট ব্যর্থ হয়েছে');
       console.error(error);
     }
   };
@@ -192,7 +212,7 @@ export default function App() {
       setUnreadCount((prev) => Math.max(0, prev - 1));
       setIsNotificationsOpen(false);
     } catch (error) {
-      toast.error('कृपया दोबारा प्रयास करें');
+      toast.error(language === 'हि' ? 'कृपया दोबारा प्रयास करें' : language === 'Bho' ? 'कृपया दोबारा कोशिश करीं' : 'অনুগ্রহ করে আবার চেষ্টা করুন');
       console.error(error);
     }
   };
@@ -202,14 +222,13 @@ export default function App() {
       {/* Mobile Container */}
       <div className="relative w-full max-w-[390px] h-full bg-white shadow-2xl overflow-hidden">
         {/* Tab Content */}
-        <div className="h-full">
+        <div className="h-full pb-16">
           {activeTab === 'chat' && (
             <ChatTab
               onNotificationClick={() => setIsNotificationsOpen(true)}
               onSwitchToGoals={handleSwitchToGoals}
               onSwitchToRates={() => setActiveTab('rates')}
               onAddFD={handleAddFD}
-              onGoalCTAClick={handleGoalCTA}
               goals={goals}
               selectedInvestment={selectedInvestment}
               onClearInvestment={() => setSelectedInvestment(null)}
@@ -226,16 +245,19 @@ export default function App() {
             />
           )}
           {activeTab === 'goals' && (
-            <GoalsTab
-              onGoalCTAClick={handleGoalCTA}
-              onUpdateGoalDeadline={handleUpdateGoalDeadline}
-              goals={goals}
-              bankAccounts={user?.bankAccounts ?? []}
-              surplus={surplus}
-              highlightedGoalId={null}
-              savedScroll={scrollPositions.goals}
-              onSaveScroll={(pos) => setScrollPositions((prev) => ({ ...prev, goals: pos }))}
-            />
+            <>
+              {/* BUG B6 FIX: was hardcoded as null — state was never passed down, feature always disabled */}
+              <GoalsTab
+                onGoalCTAClick={handleGoalCTA}
+                onUpdateGoalDeadline={handleUpdateGoalDeadline}
+                goals={goals}
+                bankAccounts={user?.bankAccounts ?? []}
+                surplus={surplus}
+                highlightedGoalId={highlightedGoalId}
+                savedScroll={scrollPositions.goals}
+                onSaveScroll={(pos) => setScrollPositions((prev) => ({ ...prev, goals: pos }))}
+              />
+            </>
           )}
         </div>
 

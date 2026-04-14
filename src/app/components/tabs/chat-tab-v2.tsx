@@ -343,150 +343,243 @@ export function ChatTab({
   };
 
   const handleBookingFlow = (userResponse: string) => {
-    if (!bookingContext) return;
-
-    if (bookingStep === 'confirm-amount' && userResponse === 'Haan, sahi hai') {
-      setBookingStep('suggest-tenure');
-      const monthsToDeadline = Math.max(1, Math.round((bookingContext.tenure || 12)));
-      const botMessage: Message = {
-        id: `${Date.now()}-bot`,
-        type: 'bot',
-        content: (
-          <>
-            Aapki goal deadline {bookingContext.goalName} के लिए चुनी गयी अवधि <strong>{monthsToDeadline} महीने</strong> है। यह ठीक है?
-          </>
-        ),
+    // --- Free FD flow: ask-amount-free (no goal required) ---
+    if (bookingStep === 'ask-amount-free') {
+      const parsed = parseInt(userResponse.replace(/[^0-9]/g, ''), 10);
+      const amount = isNaN(parsed) || parsed < 1000 ? 0 : parsed;
+      if (amount === 0) {
+        const errMsg: Message = { id: `${Date.now()}-bot`, type: 'bot', content: 'कृपया एक वैध राशि लिखें (जैसे 50000). न्यूनतम ₹1,000 है।', timestamp: new Date() };
+        setMessages((prev) => [...prev, errMsg]);
+        return;
+      }
+      setBookingContext((prev) => prev ? { ...prev, amount } : { goalName: '', amount, bankName: 'HDFC Bank', interestRate: 7.5, tenure: 12 });
+      setBookingStep('ask-tenure-free');
+      const askTenure: Message = {
+        id: `${Date.now()}-bot`, type: 'bot',
+        content: `बढ़िया! ₹${amount.toLocaleString('en-IN')} की FD कितने महीने के लिए करनी है?`,
         timestamp: new Date(),
-        options: [`Haan, ${monthsToDeadline} महीने ठीक है`, 'Alag tenure chahiye'],
+        options: ['6 महीने', '12 महीने', '24 महीने'],
       };
-      setMessages((prev) => [...prev, botMessage]);
-      void persistMessages([botMessage]);
+      setMessages((prev) => [...prev, askTenure]);
+      if (sessionId) void persistMessages(sessionId, [askTenure]);
       return;
     }
 
-    if (bookingStep === 'suggest-tenure' && userResponse.includes('ठीक है')) {
+    // --- Free FD flow: ask-tenure-free ---
+    if (bookingStep === 'ask-tenure-free') {
+      const parsed = parseInt(userResponse.replace(/[^0-9]/g, ''), 10);
+      const tenure = isNaN(parsed) || parsed < 1 ? 0 : Math.min(parsed, 120);
+      if (tenure === 0) {
+        const errMsg: Message = { id: `${Date.now()}-bot`, type: 'bot', content: 'कृपया महीनों की संख्या लिखें (जैसे 12)।', timestamp: new Date() };
+        setMessages((prev) => [...prev, errMsg]);
+        return;
+      }
+      setBookingContext((prev) => prev ? { ...prev, tenure } : prev);
       setBookingStep('show-fd-option');
+      const amount = bookingContext?.amount ?? 0;
+      const rate = 7.5;
+      const maturityAmount = calculateMaturityAmount(amount, rate, tenure);
+      const maturityDate = new Date(new Date().setMonth(new Date().getMonth() + tenure));
       const botMessage: Message = {
-        id: `${Date.now()}-bot`,
-        type: 'bot',
+        id: `${Date.now()}-bot`, type: 'bot',
         content: 'Yeh hai aapke liye best FD option:',
         timestamp: new Date(),
         cardType: 'fd-recommendation',
-        cardData: {
-          bankName: bookingContext.bankName || 'HDFC Bank',
-          interestRate: bookingContext.interestRate || 7.5,
-          principal: bookingContext.amount,
-          tenure: bookingContext.tenure || 12,
-          maturityAmount: calculateMaturityAmount(bookingContext.amount, bookingContext.interestRate || 7.5, bookingContext.tenure || 12),
-          maturityDate: new Date(new Date().setMonth(new Date().getMonth() + (bookingContext.tenure || 12))),
-          deadline: new Date(),
-        },
+        cardData: { bankName: 'HDFC Bank', interestRate: rate, principal: amount, tenure, maturityAmount, maturityDate, deadline: maturityDate },
       };
       const followUp: Message = {
-        id: `${Date.now()}-bot-follow`,
-        type: 'bot',
-        content: (
-          <>
-            यह FD <JargonTooltip term="p.a." explanation="matlab har saal" /> पर होगा। आगे बढ़ें?
-          </>
-        ),
+        id: `${Date.now()}-bot-follow`, type: 'bot',
+        content: (<>यह FD <JargonTooltip term="p.a." explanation="matlab har saal" /> पर होगा। आगे बढ़ें?</>),
         timestamp: new Date(),
         options: ['Haan, yahi theek hai', 'Doosra bank dekhna hai'],
       };
       setMessages((prev) => [...prev, botMessage, followUp]);
-      void persistMessages([botMessage, followUp]);
+      if (sessionId) void persistMessages(sessionId, [botMessage, followUp]);
       return;
     }
 
-    if (bookingStep === 'show-fd-option' && userResponse === 'Haan, yahi theek hai') {
-      setBookingStep('confirm-source');
-      const sourceMessage: Message = {
-        id: `${Date.now()}-bot`,
-        type: 'bot',
-        content: '',
-        timestamp: new Date(),
-        cardType: 'source-confirmation',
-        cardData: {
-          maturedAmount: bookingContext.amount * 0.3,
-          savingsAmount: bookingContext.amount * 0.7,
-        },
-      };
-      const confirmMessage: Message = {
-        id: `${Date.now()}-bot-follow`,
-        type: 'bot',
-        content: 'Dono account ready hain. Aage badhein?',
-        timestamp: new Date(),
-        options: ['Haan, aage badho', 'Sirf ek source use karna hai'],
-      };
-      setMessages((prev) => [...prev, sourceMessage, confirmMessage]);
-      void persistMessages([sourceMessage, confirmMessage]);
+    if (!bookingContext) return;
+
+    // ---- STEP: confirm-amount ----
+    if (bookingStep === 'confirm-amount') {
+      if (userResponse === 'Haan, sahi hai') {
+        setBookingStep('suggest-tenure');
+        const monthsToDeadline = Math.max(1, Math.round((bookingContext.tenure || 12)));
+        const botMessage: Message = {
+          id: `${Date.now()}-bot`, type: 'bot',
+          content: (<>Aapki goal deadline {bookingContext.goalName} के लिए चुनी गयी अवधि <strong>{monthsToDeadline} महीने</strong> है। यह ठीक है?</>),
+          timestamp: new Date(),
+          options: [`Haan, ${monthsToDeadline} महीने ठीक है`, 'Alag tenure chahiye'],
+        };
+        setMessages((prev) => [...prev, botMessage]);
+        if (sessionId) void persistMessages(sessionId, [botMessage]);
+      } else {
+        // User wants to change amount
+        setBookingStep('ask-amount-free');
+        const askAmtMsg: Message = {
+          id: `${Date.now()}-bot`, type: 'bot',
+          content: 'ठीक है! कितना पैसा FD में लगाना चाहते हैं?',
+          timestamp: new Date(),
+          options: ['₹10,000', '₹50,000', '₹1,00,000'],
+        };
+        setMessages((prev) => [...prev, askAmtMsg]);
+      }
       return;
     }
 
-    if (bookingStep === 'confirm-source' && userResponse === 'Haan, aage badho') {
-      setBookingStep('kyc-check');
-      const kycMessage: Message = {
-        id: `${Date.now()}-bot`,
-        type: 'bot',
-        content: 'Aapko Aadhaar number aur PAN card ready rakhna hoga. Kya dono available hain?',
-        timestamp: new Date(),
-        options: ['Haan dono hain', 'Nahi hain abhi'],
-      };
-      setMessages((prev) => [...prev, kycMessage]);
-      void persistMessages([kycMessage]);
-      return;
-    }
-
-    if (bookingStep === 'kyc-check' && userResponse === 'Haan dono hain') {
-      setBookingStep('show-summary');
-      const maturityAmount = calculateMaturityAmount(bookingContext.amount, bookingContext.interestRate || 7.5, bookingContext.tenure || 12);
-      const goal = goals.find((g) => g.name === bookingContext.goalName);
-      const currentJama = goal?.jamaHua || 0;
-      const incomingFDs = goal?.activeFDs.reduce((sum, fd) => sum + fd.maturityAmount, 0) || 0;
-      const totalJama = currentJama + incomingFDs + maturityAmount;
-      const summary: Message = {
-        id: `${Date.now()}-bot`,
-        type: 'bot',
-        content: '',
-        timestamp: new Date(),
-        cardType: 'fd-summary',
-        cardData: {
-          bankName: bookingContext.bankName || 'HDFC Bank',
-          amount: bookingContext.amount,
-          tenure: bookingContext.tenure || 12,
-          interestRate: bookingContext.interestRate || 7.5,
-          maturityDate: new Date(new Date().setMonth(new Date().getMonth() + (bookingContext.tenure || 12))),
-          maturityAmount,
-          goalName: bookingContext.goalName,
-          goalImpact: {
-            targetAmount: goal?.targetAmount || 0,
-            totalJama,
-            completionPercentage: Math.round((totalJama / (goal?.targetAmount || 1)) * 100),
+    // ---- STEP: suggest-tenure ----
+    if (bookingStep === 'suggest-tenure') {
+      if (userResponse.includes('ठीक है')) {
+        setBookingStep('show-fd-option');
+        const botMessage: Message = {
+          id: `${Date.now()}-bot`, type: 'bot',
+          content: 'Yeh hai aapke liye best FD option:',
+          timestamp: new Date(),
+          cardType: 'fd-recommendation',
+          cardData: {
+            bankName: bookingContext.bankName || 'HDFC Bank',
+            interestRate: bookingContext.interestRate || 7.5,
+            principal: bookingContext.amount,
+            tenure: bookingContext.tenure || 12,
+            maturityAmount: calculateMaturityAmount(bookingContext.amount, bookingContext.interestRate || 7.5, bookingContext.tenure || 12),
+            maturityDate: new Date(new Date().setMonth(new Date().getMonth() + (bookingContext.tenure || 12))),
+            deadline: new Date(),
           },
-        },
-      };
-      const confirmMessage: Message = {
-        id: `${Date.now()}-bot-follow`,
-        type: 'bot',
-        content: 'Sab sahi lag raha hai?',
-        timestamp: new Date(),
-        options: ['Haan, FD karo', 'Nahi, badlna hai'],
-      };
-      setMessages((prev) => [...prev, summary, confirmMessage]);
-      void persistMessages([summary, confirmMessage]);
+        };
+        const followUp: Message = {
+          id: `${Date.now()}-bot-follow`, type: 'bot',
+          content: (<>यह FD <JargonTooltip term="p.a." explanation="matlab har saal" /> पर होगा। आगे बढ़ें?</>),
+          timestamp: new Date(),
+          options: ['Haan, yahi theek hai', 'Doosra bank dekhna hai'],
+        };
+        setMessages((prev) => [...prev, botMessage, followUp]);
+        if (sessionId) void persistMessages(sessionId, [botMessage, followUp]);
+      } else {
+        // User wants different tenure
+        setBookingStep('ask-tenure-free');
+        const askTenure: Message = {
+          id: `${Date.now()}-bot`, type: 'bot',
+          content: `₹${(bookingContext.amount || 0).toLocaleString('en-IN')} की FD कितने महीने के लिए करनी है?`,
+          timestamp: new Date(),
+          options: ['6 महीने', '12 महीने', '24 महीने'],
+        };
+        setMessages((prev) => [...prev, askTenure]);
+        if (sessionId) void persistMessages(sessionId, [askTenure]);
+      }
       return;
     }
 
+    // ---- STEP: show-fd-option ----
+    if (bookingStep === 'show-fd-option') {
+      if (userResponse === 'Haan, yahi theek hai') {
+        setBookingStep('confirm-source');
+        const sourceMessage: Message = {
+          id: `${Date.now()}-bot`, type: 'bot', content: '',
+          timestamp: new Date(),
+          cardType: 'source-confirmation',
+          cardData: { maturedAmount: bookingContext.amount * 0.3, savingsAmount: bookingContext.amount * 0.7 },
+        };
+        const confirmMessage: Message = {
+          id: `${Date.now()}-bot-follow`, type: 'bot',
+          content: 'Dono account ready hain. Aage badhein?',
+          timestamp: new Date(),
+          options: ['Haan, aage badho', 'Sirf ek source use karna hai'],
+        };
+        setMessages((prev) => [...prev, sourceMessage, confirmMessage]);
+        if (sessionId) void persistMessages(sessionId, [sourceMessage, confirmMessage]);
+      } else {
+        // User wants other bank — gracefully continue with HDFC for demo
+        const msg: Message = {
+          id: `${Date.now()}-bot`, type: 'bot',
+          content: 'हम जल्द ही और बैंक जोड़ेंगे! अभी HDFC के साथ आगे बढ़ते हैं।',
+          timestamp: new Date(),
+          options: ['Haan, yahi theek hai'],
+        };
+        setMessages((prev) => [...prev, msg]);
+      }
+      return;
+    }
+
+    // ---- STEP: confirm-source ----
+    if (bookingStep === 'confirm-source') {
+      if (userResponse === 'Haan, aage badho') {
+        setBookingStep('kyc-check');
+        const kycMessage: Message = {
+          id: `${Date.now()}-bot`, type: 'bot',
+          content: 'Aapko Aadhaar number aur PAN card ready rakhna hoga. Kya dono available hain?',
+          timestamp: new Date(),
+          options: ['Haan dono hain', 'Nahi hain abhi'],
+        };
+        setMessages((prev) => [...prev, kycMessage]);
+        if (sessionId) void persistMessages(sessionId, [kycMessage]);
+      } else {
+        // Single source — acknowledge and proceed
+        const msg: Message = {
+          id: `${Date.now()}-bot`, type: 'bot',
+          content: 'ठीक है, sirf ek account se payment hogi!',
+          timestamp: new Date(),
+          options: ['Haan, aage badho'],
+        };
+        setMessages((prev) => [...prev, msg]);
+      }
+      return;
+    }
+
+    // ---- STEP: kyc-check ----
+    if (bookingStep === 'kyc-check') {
+      if (userResponse === 'Haan dono hain') {
+        setBookingStep('show-summary');
+        const maturityAmount = calculateMaturityAmount(bookingContext.amount, bookingContext.interestRate || 7.5, bookingContext.tenure || 12);
+        const goal = goals.find((g) => g.name === bookingContext.goalName);
+        const currentJama = goal?.jamaHua || 0;
+        const incomingFDs = goal?.activeFDs.reduce((sum, fd) => sum + fd.maturityAmount, 0) || 0;
+        const totalJama = currentJama + incomingFDs + maturityAmount;
+        const summary: Message = {
+          id: `${Date.now()}-bot`, type: 'bot', content: '',
+          timestamp: new Date(),
+          cardType: 'fd-summary',
+          cardData: {
+            bankName: bookingContext.bankName || 'HDFC Bank',
+            amount: bookingContext.amount,
+            tenure: bookingContext.tenure || 12,
+            interestRate: bookingContext.interestRate || 7.5,
+            maturityDate: new Date(new Date().setMonth(new Date().getMonth() + (bookingContext.tenure || 12))),
+            maturityAmount,
+            goalName: bookingContext.goalName,
+            goalImpact: { targetAmount: goal?.targetAmount || 0, totalJama, completionPercentage: Math.round((totalJama / (goal?.targetAmount || 1)) * 100) },
+          },
+        };
+        const confirmMessage: Message = {
+          id: `${Date.now()}-bot-follow`, type: 'bot',
+          content: 'Sab sahi lag raha hai?',
+          timestamp: new Date(),
+          options: ['Haan, FD karo', 'Nahi, badlna hai'],
+        };
+        setMessages((prev) => [...prev, summary, confirmMessage]);
+        if (sessionId) void persistMessages(sessionId, [summary, confirmMessage]);
+      } else {
+        // KYC not ready — skip for demo
+        const msg: Message = {
+          id: `${Date.now()}-bot`, type: 'bot',
+          content: 'कोई बात नहीं! Demo में बिना KYC के आगे बढ़ रहे हैं।',
+          timestamp: new Date(),
+          options: ['Haan dono hain'],
+        };
+        setMessages((prev) => [...prev, msg]);
+      }
+      return;
+    }
+
+    // ---- STEP: show-summary ----
     if (bookingStep === 'show-summary' && userResponse === 'Haan, FD karo') {
       setBookingStep('processing');
       const processing: Message = {
-        id: `${Date.now()}-bot`,
-        type: 'bot',
+        id: `${Date.now()}-bot`, type: 'bot',
         content: 'Aapki FD process ho rahi hai... एक second',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, processing]);
-      void persistMessages([processing]);
+      if (sessionId) void persistMessages(sessionId, [processing]);
 
       setTimeout(async () => {
         setBookingStep('success');
@@ -507,9 +600,7 @@ export function ChatTab({
           setCreatedFdId(fdId);
         }
         const successMessage: Message = {
-          id: `${Date.now()}-bot-success`,
-          type: 'bot',
-          content: '',
+          id: `${Date.now()}-bot-success`, type: 'bot', content: '',
           timestamp: new Date(),
           cardType: 'booking-success',
           cardData: {
@@ -675,20 +766,19 @@ export function ChatTab({
         {isDefaultView && (
           <>
             <GreetingCard userName="रमेश" idleAmount={283000} />
-            <ProactiveAlertCard {...getMostUrgentAlert} />
             {showQuickActions && (
               <QuickActionPills
                 onNewFD={() => {
                   setShowQuickActions(false);
-                  setMessages([
-                    {
-                      id: `${Date.now()}-bot`,
-                      type: 'bot',
-                      content: 'Kaunse goal ke लिए FD karna chahte hain?',
-                      timestamp: new Date(),
-                      options: goals.map((g) => `${g.icon} ${g.name}`),
-                    },
-                  ]);
+                  setBookingContext({ goalName: '', amount: 0, bankName: 'HDFC Bank', interestRate: 7.5, tenure: 12 });
+                  setBookingStep('ask-amount-free');
+                  setMessages([{
+                    id: `${Date.now()}-bot`,
+                    type: 'bot',
+                    content: 'ठीक है! कितना पैसा FD में लगाना चाहते हैं?',
+                    timestamp: new Date(),
+                    options: ['₹10,000', '₹50,000', '₹1,00,000'],
+                  }]);
                 }}
                 onViewGoals={onSwitchToGoals}
                 onViewRates={onSwitchToRates}

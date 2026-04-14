@@ -1,11 +1,11 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors()); // Allow all ports since Vite may run on 5174 or others
 app.use(express.json());
 
 const now = new Date().toISOString();
@@ -58,16 +58,19 @@ const calculateMaturityAmount = (principal, rate, tenure) => {
 
 const getSurplusPayload = () => {
   const savings = bankAccounts.filter((account) => account.type === 'savings').reduce((sum, account) => sum + account.balance, 0);
-  const committed = fds.filter((fd) => fd.status === 'active').reduce((sum, fd) => sum + fd.amount, 0);
+  // BUG B2 FIX: 'committed' was double-subtracting FD amounts.
+  // POST /api/fds already does savingsAccount.balance -= amount, so savings already
+  // excludes invested money. Subtracting committed again under-reported investableSurplus
+  // by the full sum of all active FD principals.
   const emergencyFund = 15000 * 5;
   const upcomingExpenses = 12000;
-  const investableSurplus = Math.max(0, savings - emergencyFund - upcomingExpenses - committed);
+  const investableSurplus = Math.max(0, savings - emergencyFund - upcomingExpenses);
   const reasoning = `आपके ${formatIndianRupee(savings)} में से ${formatIndianRupee(emergencyFund)} emergency के लिए ज़रूरी है, ${formatIndianRupee(upcomingExpenses)} अगले महीने के खर्चे के लिए। अभी सिर्फ ${formatIndianRupee(investableSurplus)} safely FD में लगा सकते हैं।`;
   return {
     totalSavings: savings,
     emergencyFund,
     upcomingExpenses,
-    alreadyCommittedToActiveFDs: committed,
+    alreadyCommittedToActiveFDs: 0, // savings balance already accounts for committed FDs
     investableSurplus,
     reasoning,
   };
@@ -186,19 +189,27 @@ app.get('/api/receipts/:fdId/pdf', async (req, res) => {
   const green = rgb(0.086, 0.639, 0.329);
   page.drawRectangle({ x: 0, y: 740, width: 595, height: 52, color: green });
   page.drawText('Nirdeshak', { x: 40, y: 752, size: 22, font, color: rgb(1,1,1) });
-  page.drawText('आपका FD सलाहकार', { x: 40, y: 734, size: 12, font, color: rgb(1,1,1) });
-  page.drawText('FD बुकिंग रसीद', { x: 210, y: 702, size: 20, font, color: green });
+  // BUG B1 FIX: Helvetica (WinAnsi) only supports codepoints 0-255.
+  // All Devanagari strings replaced with ASCII equivalents to prevent crash.
+  page.drawText('Aapka FD Salaahkaar', { x: 40, y: 734, size: 12, font, color: rgb(1,1,1) });
+  page.drawText('FD Booking Receipt', { x: 210, y: 702, size: 20, font, color: green });
+  // BUG B1 FIX (cont.): formatIndianRupee returns the ₹ symbol (U+20B9) which also
+  // crashes WinAnsi encoding. Using a PDF-safe ASCII formatter with "INR" prefix instead.
+  // Goal names are Devanagari and also cannot be rendered; showing goal ID instead.
+  const formatAmountPDF = (amount) =>
+    'INR ' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(amount);
+
   const rows = [
-    ['रसीद संख्या', receiptNo],
-    ['दिनांक व समय', new Date(fd.createdAt).toLocaleString('hi-IN')],
-    ['खाताधारक', user.name],
-    ['बैंक', fd.bankName],
-    ['मूल राशि', formatIndianRupee(fd.amount)],
-    ['अवधि', `${fd.tenure} महीने`],
-    ['ब्याज दर', `${fd.interestRate}% प्रति वर्ष`],
-    ['परिपक्वता तिथि', new Date(fd.maturityDate).toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })],
-    ['परिपक्वता राशि', formatIndianRupee(fd.maturityAmount)],
-    ['लक्ष्य', goal ? goal.name : '—'],
+    ['Receipt No.', receiptNo],
+    ['Date & Time', new Date(fd.createdAt).toLocaleString('en-IN')],
+    ['Account Holder', user.name],
+    ['Bank', fd.bankName],
+    ['Principal Amount', formatAmountPDF(fd.amount)],
+    ['Tenure', `${fd.tenure} months`],
+    ['Interest Rate', `${fd.interestRate}% per annum`],
+    ['Maturity Date', new Date(fd.maturityDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })],
+    ['Maturity Amount', formatAmountPDF(fd.maturityAmount)],
+    ['Goal ID', goal ? `Goal #${goal.id}` : '-'],
   ];
   let y = 660;
   rows.forEach(([label, value]) => {
@@ -206,7 +217,8 @@ app.get('/api/receipts/:fdId/pdf', async (req, res) => {
     page.drawText(String(value), { x: 300, y, size: 12, font, color: rgb(0.06,0.06,0.06) });
     y -= 30;
   });
-  page.drawText('Nirdeshak द्वारा बुक किया गया • यह एक प्रोटोटाइप रसीद है', { x: 40, y: 110, size: 10, font, color: rgb(0.4,0.4,0.4) });
+  // BUG B1 FIX: footer also replaced with ASCII
+  page.drawText('Booked via Nirdeshak - This is a prototype receipt', { x: 40, y: 110, size: 10, font, color: rgb(0.4,0.4,0.4) });
   const pdfBytes = await pdfDoc.save();
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${receiptFileName}"`);

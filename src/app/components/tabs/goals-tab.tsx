@@ -5,6 +5,7 @@ import type { Goal } from '../../lib/types';
 import { formatIndianRupee, formatDate, calculateMaturityAmount } from '../../utils/format';
 import { Progress } from '../ui/progress';
 import { Slider } from '../ui/slider';
+import { useLanguage } from '../../lib/LanguageContext';
 
 interface GoalsTabProps {
   onGoalCTAClick: (goalName: string, amount: number, bankName?: string, interestRate?: number, tenure?: number) => void;
@@ -17,7 +18,8 @@ interface GoalsTabProps {
   onSaveScroll: (position: number) => void;
 }
 
-export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedScroll, onSaveScroll }: GoalsTabProps) {
+export function GoalsTab({ onGoalCTAClick, onUpdateGoalDeadline, goals, bankAccounts, surplus, savedScroll, onSaveScroll }: GoalsTabProps) {
+  const { lang, language } = useLanguage();
   const completedGoals = goals.filter((goal) => goal.status === 'completed');
   const activeGoals = goals.filter((goal) => goal.status !== 'completed');
   const savingsTotal = bankAccounts.filter((account) => account.type === 'savings').reduce((sum, account) => sum + account.balance, 0);
@@ -29,7 +31,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
     upcomingExpenses: 12000,
     alreadyCommittedToActiveFDs: investedTotal,
     investableSurplus: fallbackSurplus,
-    reasoning: 'अपडेट करने के लिए रिफ्रेश करें।',
+    reasoning: lang.goalsTab.refreshToUpdate,
   } as SurplusPayload;
   const [selectedOptions, setSelectedOptions] = useState<{ [goalId: string]: 'option1' | 'option2' | 'option3' }>({});
   const [customAmounts, setCustomAmounts] = useState<{ [goalId: string]: number }>({});
@@ -64,13 +66,13 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
     <div ref={scrollRef} onScroll={handleScroll} className="h-full bg-[#fdfbf7] pb-20 overflow-y-auto">
       {/* Header */}
       <div className="bg-white px-4 py-4 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-gray-800">आपके सपने</h2>
+        <h2 className="text-xl font-bold text-gray-800">{lang.goalsTab.myDreams}</h2>
       </div>
 
       {/* Accounts Section */}
       <div className="p-4">
         <div className="mb-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border-2 border-blue-200">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">कुल निवेश योग्य पैसा</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">{lang.goalsTab.investableMoney}</h3>
           <p className="text-3xl font-bold text-primary mb-3">
             {formatIndianRupee(surplusPayload.investableSurplus)}
           </p>
@@ -79,7 +81,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
           </div>
         </div>
 
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">जुड़े हुए खाते</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">{lang.goalsTab.linkedAccounts}</h3>
 
         <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {bankAccounts.map((account) => (
@@ -143,24 +145,28 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
 
       {/* Goals Section */}
       <div className="px-4 pb-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">मेरे लक्ष्य</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">{lang.goalsTab.myGoals}</h3>
 
         <div className="space-y-4">
           {activeGoals.map((goal) => {
             // Layer 1: Jama Hua (Secured) - already credited
             const layer1_jamaHua = goal.jamaHua;
 
+            // Calculate projection if Layer 3 is invested
+            const currentDeadline = extendedDeadlines[goal.id] || goal.deadline;
+
             // Layer 2: Aa Raha Hai (Incoming) - active FDs
             const layer2_incoming = goal.activeFDs.reduce((sum, fd) => sum + fd.maturityAmount, 0);
-            const lateFDs = goal.activeFDs.filter(fd => fd.maturityDate > goal.deadline);
+            // BUG B7 FIX: was using goal.deadline (original) instead of currentDeadline.
+            // After user extends deadline, FDs that now land before the new date were still
+            // flagged as "late" — causing a false warning card to appear.
+            const lateFDs = goal.activeFDs.filter(fd => fd.maturityDate > currentDeadline);
 
             // Layer 3: Laga Sakte Ho (Investable)
             const layer3_maturedIdle = goal.idleMaturedMoney;
             const layer3_safeSurplus = surplusPayload.investableSurplus;
             const layer3_total = layer3_maturedIdle + layer3_safeSurplus;
 
-            // Calculate projection if Layer 3 is invested
-            const currentDeadline = extendedDeadlines[goal.id] || goal.deadline;
             const tenureInMonths = Math.max(1, Math.round((currentDeadline.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24 * 30)));
             const bestRate = 8.5;
             const layer3_projectedMaturity = layer3_total > 0
@@ -176,7 +182,10 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
             // Determine status based on FULL PROJECTION (not just Jama Hua)
             const isOnTrack = totalAtDeadline >= goal.targetAmount;
             const isUnachievable = layer4_gap > 0 && layer3_total === 0; // No investable money and still a gap
-            const surplus = totalAtDeadline - goal.targetAmount;
+            // BUG B8 FIX: was named 'surplus', shadowing the outer 'surplus' SurplusPayload prop.
+            // This made the code misleading: inside this .map() 'surplus' silently meant a number
+            // (extra ₹ above goal) while the outer scope used it as SurplusPayload | null.
+            const surplusExtra = totalAtDeadline - goal.targetAmount;
 
             // Progress bar shows only Layer 1
             const progress = (layer1_jamaHua / goal.targetAmount) * 100;
@@ -224,7 +233,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                     <div>
                       <h4 className="font-bold text-lg text-gray-800">{goal.name}</h4>
                       <p className="text-xs text-gray-500">
-                        अंतिम तारीख: {formatDate(currentDeadline)}
+                        Deadline: {formatDate(currentDeadline)}
                       </p>
                     </div>
                   </div>
@@ -246,13 +255,13 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                 {/* Two Stat Boxes */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-500 mb-1">लक्ष्य राशि</p>
+                    <p className="text-xs text-gray-500 mb-1">Target</p>
                     <p className="text-lg font-bold text-gray-800">
                       {formatIndianRupee(goal.targetAmount)}
                     </p>
                   </div>
                   <div className={`rounded-xl p-3 ${isUnachievable ? 'bg-red-50' : 'bg-green-50'}`}>
-                    <p className="text-xs text-gray-500 mb-1">जमा हुआ</p>
+                    <p className="text-xs text-gray-500 mb-1">{lang.goalsTab.goalSecured}</p>
                     <p className={`text-lg font-bold ${isUnachievable ? 'text-red-700' : 'text-primary'}`}>
                       {formatIndianRupee(layer1_jamaHua)}
                     </p>
@@ -262,7 +271,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                 {/* Progress Bar - Layer 1 only */}
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-2">
-                    <p className="text-sm font-semibold text-gray-700">प्रगति (जमा हुआ)</p>
+                    <p className="text-sm font-semibold text-gray-700">Progress ({lang.goalsTab.goalSecured})</p>
                     <p className={`text-sm font-bold ${isUnachievable ? 'text-red-700' : 'text-primary'}`}>
                       {Math.round(progress)}%
                     </p>
@@ -275,11 +284,11 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
 
                 {/* Money Breakdown - 4 Layers */}
                 <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-4 mb-4 space-y-3">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">💰 पैसे की पूरी तस्वीर</p>
+                  <p className="text-xs font-semibold text-gray-700 mb-2">💰 Full Picture</p>
 
                   {/* Layer 1: Secured */}
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">✓ Secured (पिछली FDs से credited)</span>
+                    <span className="text-gray-600">✓ {lang.goalsTab.goalSecured}</span>
                     <span className="font-bold text-green-700">{formatIndianRupee(layer1_jamaHua)}</span>
                   </div>
 
@@ -303,7 +312,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                   {/* Layer 3: Investable */}
                   <div className="flex justify-between items-center text-sm">
                     <div className="flex-1">
-                      <span className="text-gray-600">💡 Laga sakte ho (आज invest कर सकते हो)</span>
+                      <span className="text-gray-600">💡 {lang.goalsTab.goalLagaSakte}</span>
                       <div className="text-xs text-gray-500 mt-1">
                         {layer3_maturedIdle > 0 && <div>• Matured idle: {formatIndianRupee(layer3_maturedIdle)}</div>}
                         {layer3_safeSurplus > 0 && <div>• Safe surplus: {formatIndianRupee(layer3_safeSurplus)}</div>}
@@ -316,11 +325,11 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                   <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-300">
                     <div className="flex items-center gap-2">
                       <span className="text-gray-600">
-                        {layer4_gap === 0 ? '✓' : '⚠️'} Baaki chahiye (अभी भी कमी)
+                        {layer4_gap === 0 ? '✓' : '⚠️'} {lang.goalsTab.goalGap}
                       </span>
                       {layer4_gap === 0 && (
                         <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">
-                          Poora ho jayega
+                          {lang.goalsTab.goalCompletedSuccess}
                         </span>
                       )}
                     </div>
@@ -344,7 +353,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                         </p>
                         {isOnTrack ? (
                           <p className="text-sm text-green-700 font-semibold mt-2">
-                            ✓ Goal पूरा हो जाएगा और <span className="font-bold">{formatIndianRupee(surplus)} extra</span> भी मिलेगा!
+                            ✓ Goal पूरा हो जाएगा और <span className="font-bold">{formatIndianRupee(surplusExtra)} extra</span> भी मिलेगा!
                           </p>
                         ) : (
                           <p className="text-sm text-orange-700 font-semibold mt-2">
@@ -362,7 +371,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                     <div className="flex items-start gap-2">
                       <X className="w-4 h-4 text-red-600 mt-0.5" />
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-red-800 mb-1">⚠️ Goal Nahi Hoga</p>
+                        <p className="text-sm font-semibold text-red-800 mb-1">⚠️ {language === 'हि' ? 'Goal नहीं होगा' : language === 'Bho' ? 'लक्ष्य ना हो पाई' : 'লক্ষ্য পূরণ হবে না'}</p>
                         <p className="text-sm text-gray-700 leading-relaxed">
                           Agar aaj poora <span className="font-bold">{formatIndianRupee(layer3_total)}</span> bhi FD mein lagaein toh <span className="font-semibold">{formatDate(currentDeadline)}</span> ko <span className="font-bold text-primary">{formatIndianRupee(totalAtDeadline)}</span> milega. Aapka total <span className="font-bold">{formatIndianRupee(goal.targetAmount)}</span> se <span className="font-bold text-red-700">{formatIndianRupee(layer4_gap)}</span> kam hai. Goal <span className="font-bold">{Math.round((totalAtDeadline / goal.targetAmount) * 100)}%</span> tak hi pahunch payega.
                         </p>
@@ -377,7 +386,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                     <div className="flex items-start gap-2">
                       <AlertCircle className="w-4 h-4 text-orange-600 mt-0.5" />
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-orange-800 mb-1">⚠️ समय की दिक्कत</p>
+                        <p className="text-sm font-semibold text-orange-800 mb-1">⚠️ {language === 'हि' ? 'समय की दिक्कत' : language === 'Bho' ? 'समय के दिक्कत' : 'সময়ের সমস্যা'}</p>
                         {lateFDs.map((fd, idx) => (
                           <p key={idx} className="text-sm text-gray-700 leading-relaxed">
                             {fd.bankName} की FD ({formatIndianRupee(fd.maturityAmount)}) आपको {formatDate(goal.deadline)} तक नहीं मिलेगी। यह {formatDate(fd.maturityDate)} को mature होगी। छोटी tenure की FD चुनें।
@@ -391,7 +400,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                 {/* Investment Options Section - Only for achievable goals with investable money */}
                 {layer3_total > 0 && !isUnachievable && (
                   <div className="space-y-3 mb-4">
-                    <h5 className="text-sm font-semibold text-gray-700">निवेश के विकल्प</h5>
+                    <h5 className="text-sm font-semibold text-gray-700">{language === 'हि' ? 'निवेश के विकल्प' : language === 'Bho' ? 'निवेश के विकल्प' : 'বিনিয়োগের বিকল্প'}</h5>
 
                     {/* Option 1: Matured FD Only - Only show if matured idle exists */}
                     {layer3_maturedIdle > 0 && (
@@ -415,11 +424,13 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-1">
-                              <p className="font-bold text-gray-800">Sirf Matured FD Wapas Lagaein</p>
+                              <p className="font-bold text-gray-800">
+                                {language === 'हि' ? 'सिर्फ मैच्योर FD वापस लगाएं' : language === 'Bho' ? 'सिर्फ मैच्योर FD वापस लगाईं' : 'শুধুমাত্র ম্যাচিওর হওয়া FD পুনরায় বিনিয়োগ করুন'}
+                              </p>
                               <p className="font-bold text-primary">{formatIndianRupee(option1Amount)}</p>
                             </div>
                             <p className="text-xs text-gray-600 mb-2">
-                              Sabse aasaan — pichli FD ka paisa wapas kaam pe lagao
+                              {language === 'हि' ? 'सबसे आसान — पिछली FD का पैसा वापस काम पे लगाओ' : language === 'Bho' ? 'सबसे आसान — पिछला FD के पइसा वापस काम पे लगाईं' : 'সবচেয়ে সহজ — আগের FD-এর টাকা আবার কাজে লাগান'}
                             </p>
                             <div className="bg-white/60 rounded-lg p-2 text-xs space-y-1">
                               <div className="flex justify-between">
@@ -468,14 +479,16 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-1">
                             <p className="font-bold text-gray-800">
-                              {layer3_maturedIdle > 0 ? 'Matured FD + Safe Surplus' : 'Safe Surplus Lagao'}
+                                {layer3_maturedIdle > 0 
+                                  ? (language === 'हि' ? 'मैच्योर FD + सुरक्षित बचत' : language === 'Bho' ? 'मैच्योर FD + सुरक्षित बचत' : 'ম্যাচিওর হওয়া FD + নিরাপদ সঞ্চয়')
+                                  : (language === 'हि' ? 'सुरक्षित बचत लगाएं' : language === 'Bho' ? 'सुरक्षित बचत लगाईं' : 'নিরাপদ সঞ্চয় বিনিয়োগ করুন')}
                             </p>
                             <p className="font-bold text-primary">{formatIndianRupee(option2Amount)}</p>
                           </div>
                           <p className="text-xs text-gray-600 mb-2">
                             {layer3_maturedIdle > 0 
-                              ? 'Sabse zyada faida — saare bekar pade paise ek saath lagao'
-                              : 'Sabse zyada faida — safe surplus ko kaam pe lagao'
+                              ? (language === 'हि' ? 'सबसे ज्यादा फायदा — सारे बेकार पड़े पैसे एक साथ लगाओ' : language === 'Bho' ? 'सबसे ढेर फायदा — सारा बेकार पडल पइसा एक साथ लगाईं' : 'সর্বোচ্চ লাভ — সমস্ত অলস টাকা একসাথে বিনিয়োগ করুন')
+                              : (language === 'हि' ? 'सबसे ज्यादा फायदा — सुरक्षित बचत को काम पे लगाओ' : language === 'Bho' ? 'सबसे ढेर फायदा — सुरक्षित बचत के काम पे लगाईं' : 'সর্বোচ্চ লাভ — নিরাপদ সঞ্চয়কে কাজে লাগান')
                             }
                           </p>
                           <div className="bg-white/60 rounded-lg p-2 text-xs space-y-1">
@@ -574,7 +587,13 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                     {/* Dynamic Projection Line */}
                     <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg p-3 border border-amber-200">
                       <p className="text-xs text-gray-700 leading-relaxed">
-                        Agar aaj <span className="font-bold text-gray-800">{formatIndianRupee(selectedAmount)}</span> lagaein → <span className="font-semibold">{formatDate(currentDeadline)}</span> ko <span className="font-bold text-primary">{formatIndianRupee(selectedMaturity)}</span> milega → Goal <span className="font-bold text-gray-800">{selectedGoalPercentage}%</span> complete hoga
+                        {language === 'हि' ? (
+                          <>अगर आज <span className="font-bold text-gray-800">{formatIndianRupee(selectedAmount)}</span> लगाएं → <span className="font-semibold">{formatDate(currentDeadline)}</span> को <span className="font-bold text-primary">{formatIndianRupee(selectedMaturity)}</span> मिलेगा → Goal <span className="font-bold text-gray-800">{selectedGoalPercentage}%</span> पूरा होगा</>
+                        ) : language === 'Bho' ? (
+                          <>अगर आज <span className="font-bold text-gray-800">{formatIndianRupee(selectedAmount)}</span> लगाईं → <span className="font-semibold">{formatDate(currentDeadline)}</span> के <span className="font-bold text-primary">{formatIndianRupee(selectedMaturity)}</span> मिली → लक्ष्य <span className="font-bold text-gray-800">{selectedGoalPercentage}%</span> पूरा हो जाई</>
+                        ) : (
+                          <>যদি আজ <span className="font-bold text-gray-800">{formatIndianRupee(selectedAmount)}</span> বিনিয়োগ করেন → <span className="font-semibold">{formatDate(currentDeadline)}</span> তারিখে <span className="font-bold text-primary">{formatIndianRupee(selectedMaturity)}</span> পাবেন → লক্ষ্য <span className="font-bold text-gray-800">{selectedGoalPercentage}%</span> সম্পন্ন হবে</>
+                        )}
                       </p>
                     </div>
 
@@ -583,7 +602,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                       onClick={() => onGoalCTAClick(goal.name, selectedAmount)}
                       className="w-full bg-primary text-white font-semibold py-3.5 rounded-xl hover:bg-primary/90 active:scale-98 transition-all shadow-sm flex items-center justify-center gap-2"
                     >
-                      <span>{formatIndianRupee(selectedAmount)} FD Mein Lagaein</span>
+                      <span>{formatIndianRupee(selectedAmount)} {lang.goalsTab.bookFd}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -592,7 +611,7 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                 {/* Unachievable Goal Options - Two buttons side by side */}
                 {isUnachievable && (
                   <div className="space-y-3">
-                    <h5 className="text-sm font-semibold text-red-700">विकल्प चुनें</h5>
+                    <h5 className="text-sm font-semibold text-red-700">{language === 'हि' ? 'विकल्प चुनें' : language === 'Bho' ? 'विकल्प चुनीं' : 'বিকল্প বেছে নিন'}</h5>
                     
                     {layer3_total > 0 ? (
                       <div className="grid grid-cols-2 gap-3">
@@ -601,8 +620,8 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                           onClick={() => onGoalCTAClick(goal.name, layer3_total)}
                           className="bg-primary text-white font-semibold py-3 px-3 rounded-xl hover:bg-primary/90 active:scale-98 transition-all shadow-sm text-center text-sm"
                         >
-                          <div className="mb-1">Jitna Ho Sake</div>
-                          <div className="text-xs opacity-90">Lagaein →</div>
+                          <div className="mb-1">{language === 'हि' ? 'जितना हो सके' : language === 'Bho' ? 'जितना हो सके' : 'যতটা সম্ভব'}</div>
+                          <div className="text-xs opacity-90">{language === 'हि' ? 'लगाएं' : language === 'Bho' ? 'लगाईं' : 'বিনিয়োগ করুন'} →</div>
                         </button>
 
                         {/* Option 2: Extend Deadline */}
@@ -612,14 +631,14 @@ export function GoalsTab({ onGoalCTAClick, goals, bankAccounts, surplus, savedSc
                           }}
                           className="bg-orange-500 text-white font-semibold py-3 px-3 rounded-xl hover:bg-orange-600 active:scale-98 transition-all shadow-sm text-center text-sm"
                         >
-                          <div className="mb-1">Deadline Badhao</div>
+                          <div className="mb-1">{language === 'हि' ? 'समय बढ़ाएं' : language === 'Bho' ? 'समय बढ़ाईं' : 'সময় বাড়ান'}</div>
                           <div className="text-xs opacity-90">→ {formatDate(minViableDeadline).split(' ')[1]} {formatDate(minViableDeadline).split(' ')[2]}</div>
                         </button>
                       </div>
                     ) : (
                       <div className="bg-red-50 rounded-xl p-4 border border-red-200">
                         <p className="text-sm text-red-800 text-center">
-                          Abhi invest karne ke liye paisa nahi hai. Deadline badhane se bhi goal poora nahi hoga.
+                          {language === 'हि' ? 'अभी निवेश करने के लिए पैसा नहीं है। समय बढ़ाने से भी लक्ष्य पूरा नहीं होगा।' : language === 'Bho' ? 'अभी निवेश करे खातिर पइसा नईखे। समय बढ़ावे से भी लक्ष्य पूरा ना होई।' : 'বর্তমানে বিনিয়োগের জন্য কোনো অর্থ নেই। সময় বাড়ালেও লক্ষ্য পূরণ হবে না।'}
                         </p>
                       </div>
                     )}

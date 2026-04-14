@@ -1,4 +1,5 @@
 import { MessageCircle, TrendingUp, Target } from 'lucide-react';
+import { useLanguage } from '../lib/LanguageContext';
 
 interface BottomNavProps {
   activeTab: 'chat' | 'rates' | 'goals';
@@ -6,10 +7,12 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
+  const { lang } = useLanguage();
+
   const tabs = [
-    { id: 'chat' as const, label: 'Chat', icon: MessageCircle },
-    { id: 'rates' as const, label: 'FD Rates', icon: TrendingUp },
-    { id: 'goals' as const, label: 'Goals', icon: Target },
+    { id: 'chat' as const, label: lang.nav.chat, icon: MessageCircle },
+    { id: 'rates' as const, label: lang.nav.rates, icon: TrendingUp },
+    { id: 'goals' as const, label: lang.nav.goals, icon: Target },
   ];
 
   return (

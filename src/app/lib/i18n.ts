@@ -1,0 +1,185 @@
+export type Language = 'हि' | 'Bho' | 'বাং';
+
+export function getTranslation(lang: Language) {
+  const dictionary = {
+    'हि': {
+      nav: {
+        chat: 'बातचीत',
+        rates: 'FD दरें',
+        goals: 'लक्ष्य',
+      },
+      goalsTab: {
+        myDreams: 'आपके सपने',
+        investableMoney: 'कुल निवेश योग्य पैसा',
+        refreshToUpdate: 'अपडेट करने के लिए रिफ्रेश करें।',
+        linkedAccounts: 'जुड़े हुए खाते',
+        myGoals: 'मेरे लक्ष्य',
+        lateWarningCard: 'यह FD लक्ष्य के बाद मैच्योर हो रही है',
+        lateWarningAction: 'समय बढ़ाएं',
+        onTrack: 'सही दिशा में',
+        atRisk: 'ध्यान दें',
+        behind: 'पीछे है',
+        completed: 'पूरा हुआ',
+        goalSecured: 'जमा हुआ',
+        goalIncoming: 'FD से आ रहा है',
+        goalLagaSakte: 'लगा सकते हो',
+        goalGap: 'बाकी चाहिए',
+        bookFd: 'FD करें',
+        goalCompletedSuccess: 'लक्ष्य पूरा होने वाला है!',
+        goalWillCompleteText: 'सुरक्षित रकम और आने वाली FD से यह Goal पूरा हो जाएगा।',
+        surplusReasoning: (savings: string, emergency: string, expenses: string, invested: string) => 
+          `आपके ${savings} में से ${emergency} इमरजेंसी फंड के लिए और ${expenses} अगले महीने के खर्चों के लिए हटा दिए गए हैं। ${invested} पहले से निवेशित है।`,
+      },
+      ratesTab: {
+        title: 'FD दरें',
+        highestReturn: 'सबसे ज्यादा रिटर्न',
+        shortestTime: 'कम से कम समय',
+        loading: 'लोड कर रहे हैं...',
+        months: 'महीने',
+        minAmount: 'न्यूनतम राशि',
+        bookNow: 'निवेश करें',
+      },
+      chatTab: {
+        subtitle: 'आपका FD सलाहकार',
+        langLabel: 'भाषा:',
+        newChat: 'नया Chat',
+        noOldChat: 'कोई पुराना चैट नहीं मिला।',
+        chatHistory: 'चैट History',
+        close: 'बंद करें',
+        optSurplus: 'खाली पड़े पैसे का FD करें',
+        optGoals: 'Goals के लिए FD करें',
+        greeting: (goalsLen: number, surplusText: string) => `नमस्ते, मैं आपका FD सलाहकार।\n\nआपकी ${goalsLen} वित्तीय ज़रूरतें (Goals) हैं और ${surplusText} सुरक्षित निवेश के लिए खाली पड़ा है।\n\nहम कहां से शुरू करें?`,
+      },
+      goalNames: {
+        'बेटी की शादी': 'बेटी की शादी',
+        'नया स्कूटर': 'नया स्कूटर',
+        'घर का रेनोवेशन': 'घर का रेनोवेशन',
+        'बेटे की पढ़ाई': 'बेटे की पढ़ाई',
+      },
+      notifications: {
+        title: 'सूचनाएं',
+        noNotifications: 'कोई नई सूचना नहीं है',
+      }
+    },
+    'Bho': {
+      nav: {
+        chat: 'बातचीत',
+        rates: 'FD के रेट',
+        goals: 'लक्ष्य',
+      },
+      goalsTab: {
+        myDreams: 'रउरा सपनवा',
+        investableMoney: 'कुल निवेश जोग पइसा',
+        refreshToUpdate: 'अपडेट करे खातिर रिफ्रेश करीं।',
+        linkedAccounts: 'जुड़ल खाता',
+        myGoals: 'हमर लक्ष्य',
+        lateWarningCard: 'ई FD लक्ष्य के बाद मैच्योर होखता',
+        lateWarningAction: 'समय बढ़ाईं',
+        onTrack: 'सही रस्ता प',
+        atRisk: 'ध्यान दीं',
+        behind: 'पीछे बा',
+        completed: 'पूरा हो गइल',
+        goalSecured: 'जमा भइल',
+        goalIncoming: 'FD से आवता',
+        goalLagaSakte: 'लगा सकेनी',
+        goalGap: 'बाकी चाहीं',
+        bookFd: 'FD करीं',
+        goalCompletedSuccess: 'लक्ष्य पूरा होखे वाला बा!',
+        goalWillCompleteText: 'सुरक्षित रकम आउर आवे वाली FD से ई लक्ष्य पूरा हो जाई।',
+        surplusReasoning: (savings: string, emergency: string, expenses: string, invested: string) => 
+          `रउरा ${savings} में से ${emergency} इमरजेंसी फंड खातिर अउर ${expenses} अगिला महीना के खरचा खातिर निकाल दिहल गइल बा। ${invested} पहिले से निवेश कइल बा।`,
+      },
+      ratesTab: {
+        title: 'FD के रेट',
+        highestReturn: 'सबसे बेसी पइसा',
+        shortestTime: 'कम से कम समय',
+        loading: 'खुलत बा...',
+        months: 'महीना',
+        minAmount: 'कम से कम',
+        bookNow: 'निवेश करीं',
+      },
+      chatTab: {
+        subtitle: 'रउवा FD सलाहकार',
+        langLabel: 'भाषा:',
+        newChat: 'नया चैट',
+        noOldChat: 'कवनो पुरान चैट ना मिलल।',
+        chatHistory: 'चैट History',
+        close: 'बंद करीं',
+        optSurplus: 'खाली पइसा के FD करीं',
+        optGoals: 'Goals खातिर FD करीं',
+        greeting: (goalsLen: number, surplusText: string) => `प्रणाम, हम रउवा FD सलाहकार हईं।\n\nरउरा ${goalsLen} गो वित्तीय जरूरत (Goals) बा और ${surplusText} सुरक्षित निवेश खातिर खाली पड़ल बा।\n\nहमनी के कहाँ से शुरू करल जाव?`,
+      },
+      goalNames: {
+        'बेटी की शादी': 'बेटी के बियाह',
+        'नया स्कूटर': 'नया स्कूटर',
+        'घर का रेनोवेशन': 'घर के मरम्मत',
+        'बेटे की पढ़ाई': 'बेटा के पढ़ाई',
+      },
+      notifications: {
+        title: 'सूचना',
+        noNotifications: 'कवनो नया सूचना नइखे',
+      }
+    },
+    'বাং': {
+      nav: {
+        chat: 'চ্যাট',
+        rates: 'FD রেট',
+        goals: 'লক্ষ্য',
+      },
+      goalsTab: {
+        myDreams: 'আপনার স্বপ্ন',
+        investableMoney: 'মোট বিনিয়োগযোগ্য অর্থ',
+        refreshToUpdate: 'আপডেট করতে রিফ্রেশ করুন।',
+        linkedAccounts: 'যুক্ত করা অ্যাকাউন্ট',
+        myGoals: 'আমার লক্ষ্য',
+        lateWarningCard: 'এই FD লক্ষ্যের পরে ম্যাচিওর হবে',
+        lateWarningAction: 'সময় বাড়ান',
+        onTrack: 'সঠিক পথে',
+        atRisk: 'ঝুঁকিপূর্ণ',
+        behind: 'পিছিয়ে আছে',
+        completed: 'সম্পন্ন হয়েছে',
+        goalSecured: 'জমা হয়েছে',
+        goalIncoming: 'FD থেকে আসছে',
+        goalLagaSakte: 'বিনিয়োগ করতে পারেন',
+        goalGap: 'আরও প্রয়োজন',
+        bookFd: 'FD করুন',
+        goalCompletedSuccess: 'লক্ষ্য প্রায় সম্পন্ন!',
+        goalWillCompleteText: 'নিরাপদ অর্থ এবং আগত FD দিয়ে এই লক্ষ্যটি পূরণ করা হবে।',
+        surplusReasoning: (savings: string, emergency: string, expenses: string, invested: string) => 
+          `আপনার ${savings} থেকে ${emergency} এমার্জেন্সি ফান্ডের জন্য এবং ${expenses} পরের মাসের খরচের জন্য সরিয়ে রাখা হয়েছে। ${invested} আগেই বিনিয়োগ করা আছে।`,
+      },
+      ratesTab: {
+        title: 'FD রেট',
+        highestReturn: 'সর্বোচ্চ রিটার্ন',
+        shortestTime: 'সবচেয়ে কম সময়',
+        loading: 'লোড হচ্ছে...',
+        months: 'মাস',
+        minAmount: 'ন্যূনতম পরিমাণ',
+        bookNow: 'বিনিয়োগ করুন',
+      },
+      chatTab: {
+        subtitle: 'আপনার FD উপদেষ্টা',
+        langLabel: 'ভাষা:',
+        newChat: 'নতুন চ্যাট',
+        noOldChat: 'পুরানো কোনো চ্যাট পাওয়া যায়নি।',
+        chatHistory: 'চ্যাট History',
+        close: 'বন্ধ করুন',
+        optSurplus: 'অলস টাকার FD করুন',
+        optGoals: 'Goals এর জন্য FD করুন',
+        greeting: (goalsLen: number, surplusText: string) => `নমস্কার, আমি আপনার FD উপদেষ্টা।\n\nআপনার ${goalsLen} টি আর্থিক লক্ষ্য (Goals) আছে এবং নিরাপদ বিনিয়োগের জন্য ${surplusText} পড়ে আছে।\n\nআমরা কোথা থেকে শুরু করব?`,
+      },
+      goalNames: {
+        'बेटी की शादी': 'মেয়ের বিয়ে',
+        'नया स्कूटर': 'নতুন স্কুটার',
+        'घर का रेनोवेशन': 'বাড়ির সংস্কার',
+        'बेटे की पढ़ाई': 'ছেলের পড়াশোনা',
+      },
+      notifications: {
+        title: 'বিজ্ঞপ্তি',
+        noNotifications: 'কোনো নতুন বিজ্ঞপ্তি নেই',
+      }
+    }
+  };
+
+  return dictionary[lang] || dictionary['हि'];
+}

@@ -3,6 +3,7 @@ import { ArrowUpDown, Clock } from 'lucide-react';
 import { formatIndianRupee, calculateMaturityAmount } from '../../utils/format';
 import type { FDOption } from '../../lib/api';
 import * as api from '../../lib/api';
+import { useLanguage } from '../../lib/LanguageContext';
 
 interface FDRatesTabProps {
   onSelectFD: (fd: FDOption) => void;
@@ -11,6 +12,7 @@ interface FDRatesTabProps {
 }
 
 export function FDRatesTab({ onSelectFD, savedScroll, onSaveScroll }: FDRatesTabProps) {
+  const { lang } = useLanguage();
   const [sortBy, setSortBy] = useState<'return' | 'tenure'>('return');
   const [fdOptions, setFdOptions] = useState<FDOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,6 +44,9 @@ export function FDRatesTab({ onSelectFD, savedScroll, onSaveScroll }: FDRatesTab
     };
   }, []);
 
+  // BUG B3 FIX: fdOptions was missing from the dependency array. When the API fetch
+  // completed and setFdOptions fired, sortedFDs never recomputed because useMemo only
+  // watched sortBy — so the FD cards stayed blank even after data loaded.
   const sortedFDs = useMemo(() => {
     return [...fdOptions].sort((a, b) => {
       if (sortBy === 'return') {
@@ -49,7 +54,7 @@ export function FDRatesTab({ onSelectFD, savedScroll, onSaveScroll }: FDRatesTab
       }
       return Math.min(...a.tenures) - Math.min(...b.tenures);
     });
-  }, [sortBy]);
+  }, [sortBy, fdOptions]);
 
   const fdCards = sortedFDs.map((fd) => {
     const maturity = calculateMaturityAmount(defaultAmount, fd.interestRate, 12);
@@ -65,14 +70,14 @@ export function FDRatesTab({ onSelectFD, savedScroll, onSaveScroll }: FDRatesTab
           <div>
             <h3 className="font-bold text-lg text-gray-800">{fd.bankName}</h3>
             <p className="text-xs text-gray-500 mt-1">
-              न्यूनतम राशि: {formatIndianRupee(fd.minAmount)}
+              {lang.ratesTab.minAmount}: {formatIndianRupee(fd.minAmount)}
             </p>
           </div>
           <div className="text-right">
             <div className="bg-primary/10 px-3 py-1 rounded-full">
               <p className="text-lg font-bold text-primary">{fd.interestRate}%</p>
             </div>
-            <p className="text-xs text-gray-500 mt-1">ब्याज दर</p>
+            <p className="text-xs text-gray-500 mt-1">Interest</p>
           </div>
         </div>
 
@@ -84,7 +89,7 @@ export function FDRatesTab({ onSelectFD, savedScroll, onSaveScroll }: FDRatesTab
                 key={tenure}
                 className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700"
               >
-                {tenure} महीने
+                {tenure} {lang.ratesTab.months}
               </span>
             ))}
           </div>
@@ -113,7 +118,7 @@ export function FDRatesTab({ onSelectFD, savedScroll, onSaveScroll }: FDRatesTab
     >
       {/* Header */}
       <div className="bg-white px-4 py-4 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-gray-800 mb-3">FD दरें</h2>
+        <h2 className="text-xl font-bold text-gray-800 mb-3">{lang.ratesTab.title}</h2>
         <div className="flex gap-2">
           <button
             onClick={() => setSortBy('return')}
@@ -124,7 +129,7 @@ export function FDRatesTab({ onSelectFD, savedScroll, onSaveScroll }: FDRatesTab
             }`}
           >
             <ArrowUpDown className="w-4 h-4" />
-            सबसे ज्यादा रिटर्न
+            {lang.ratesTab.highestReturn}
           </button>
           <button
             onClick={() => setSortBy('tenure')}
@@ -135,7 +140,7 @@ export function FDRatesTab({ onSelectFD, savedScroll, onSaveScroll }: FDRatesTab
             }`}
           >
             <Clock className="w-4 h-4" />
-            कम से कम समय
+            {lang.ratesTab.shortestTime}
           </button>
         </div>
       </div>
@@ -144,7 +149,7 @@ export function FDRatesTab({ onSelectFD, savedScroll, onSaveScroll }: FDRatesTab
       <div className="p-4 space-y-3">
         {isLoading ? (
           <div className="rounded-2xl bg-white p-6 text-center text-gray-600 shadow-sm">
-            लोड कर रहे हैं...
+            {lang.ratesTab.loading}
           </div>
         ) : sortedFDs.length === 0 ? (
           <div className="rounded-2xl bg-white p-6 text-center text-gray-600 shadow-sm">

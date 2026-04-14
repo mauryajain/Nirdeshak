@@ -1,6 +1,7 @@
 import { X, Bell, TrendingUp, AlertCircle, Calendar } from 'lucide-react';
 import { formatIndianRupee } from '../utils/format';
 import type { NotificationRecord } from '../lib/api';
+import { useLanguage } from '../lib/LanguageContext';
 
 interface NotificationsProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface NotificationsProps {
 }
 
 export function Notifications({ isOpen, notifications, onClose, onNotificationCTA }: NotificationsProps) {
+  const { lang } = useLanguage();
   if (!isOpen) return null;
 
   const getIcon = (type: string) => {
@@ -51,7 +53,7 @@ export function Notifications({ isOpen, notifications, onClose, onNotificationCT
       <div className="absolute right-0 top-0 bottom-0 w-full max-w-[390px] bg-white shadow-2xl animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="bg-primary text-white px-4 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold">सूचनाएं</h2>
+          <h2 className="text-xl font-bold">{lang.notifications.title}</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-white/20 rounded-lg transition-colors"
@@ -64,8 +66,7 @@ export function Notifications({ isOpen, notifications, onClose, onNotificationCT
         <div className="overflow-y-auto h-[calc(100%-64px)] p-4 space-y-3">
           {notifications.length === 0 ? (
             <div className="rounded-2xl p-6 text-center border border-gray-200 bg-gray-50">
-              <p className="font-semibold text-gray-800 mb-2">कोई नई सूचना नहीं</p>
-              <p className="text-sm text-gray-600">आपका निवेश ट्रैक कर रहे हैं।</p>
+              <p className="font-semibold text-gray-800 mb-2">{lang.notifications.noNotifications}</p>
             </div>
           ) : (
             notifications.map((notification) => (
