@@ -8,14 +8,11 @@ COPY package*.json ./
 # Install ALL dependencies (including vite/build tools)
 RUN npm install
 
-# Fix execute permissions on CLI binaries (required on Alpine Linux)
-RUN chmod -R +x node_modules/.bin/
-
 # Copy source files
 COPY . .
 
-# Build the React frontend
-RUN npm run build
+# Build the React frontend — call node directly to bypass .bin symlink permission issues
+RUN node node_modules/vite/bin/vite.js build
 
 # Expose the API port
 EXPOSE 3001
