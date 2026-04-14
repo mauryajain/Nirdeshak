@@ -3,7 +3,7 @@
 
 > India's first **proactive** Fixed Deposit advisor for Tier 2/3 users. Not a chatbot with a Hindi skin. Not a rate directory. A financial co-pilot that watches your money across every connected account, detects idle savings in real time, links every rupee to a goal you care about, and guides you from confusion to a confirmed FD booking — in your own language, before you even think to ask.
 
-LIVE DEMO LINK: nirdeshak-production.up.railway.app
+LIVE DEMO LINK: <nirdeshak-production.up.railway.app>
 ---
 
 ## The Problem We Are Solving
