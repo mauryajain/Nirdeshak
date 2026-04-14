@@ -4,5 +4,3 @@ buildCommand = "npm install --include=dev && npm run build"
 
 [deploy]
 startCommand = "node server.mjs"
-restartPolicyType = "on-failure"
-restartPolicyMaxRetries = 3
