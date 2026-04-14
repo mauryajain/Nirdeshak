@@ -1,6 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -307,6 +312,14 @@ app.put('/api/notifications/:id/read', (req, res) => {
   if (!notification) return res.status(404).json({ message: 'Notification not found' });
   notification.isRead = true;
   res.json(notification);
+});
+
+// Serve built React frontend in production (Render / any static host)
+app.use(express.static(join(__dirname, 'dist')));
+
+// Catch-all: send index.html for any non-API route (React Router support)
+app.get('*', (req, res) => {
+  res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {
